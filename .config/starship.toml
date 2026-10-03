@@ -1,0 +1,37 @@
+add_newline = true
+
+format = """
+$directory\
+$git_branch\
+$git_status\
+$php
+$character
+"""
+
+# 📁 Directory
+[directory]
+style = "#22c55e italic"        # green
+truncation_length = 3
+truncate_to_repo = true
+
+# 🌿 Git branch
+[git_branch]
+symbol = "🌿 "
+style = "white"        # purple
+format = "[$symbol$branch]($style) " 
+
+# 🔄 Git status (THIS controls ⇣4⇡1 !)
+[git_status]
+format = "[$ahead_behind $modified]($style) "
+style = "bold #f59e0b"        # amber
+conflicted = "⚔️ "
+diverged = "⇕"
+untracked = "?"
+
+[character]
+success_symbol = "[➜ ](bold #22c55e)" # only works if using older syntax
+error_symbol = "[💥 ](bold #ef4444)"  # error arrow
+
+[php]
+#style = "blue"
+disabled = true

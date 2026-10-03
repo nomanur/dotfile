@@ -1,0 +1,21 @@
+# iTerm2 Smoooooth Profile
+palette = 0=#000000
+palette = 1=#c0392b
+palette = 2=#27ae60
+palette = 3=#f39c12
+palette = 4=#2980b9
+palette = 5=#8e44ad
+palette = 6=#2771a3
+palette = 7=#bdc3c7
+palette = 8=#555555
+palette = 9=#e74c3c
+palette = 10=#2ecc71
+palette = 11=#f1c40f
+palette = 12=#3498db
+palette = 13=#9b59b6
+palette = 14=#34495e
+palette = 15=#ffffff
+background = #101419
+foreground = #abb2bf
+cursor-color = #ffffff
+selection-background = #2c3e50
