@@ -184,7 +184,7 @@ Panel {
     id: button
     anchors.fill: parent
     bar: root.bar
-    text: "\uf09b"
+    text: "\uf021"
     labelText: root.modifiedCount > 0 ? String(root.modifiedCount) : (root.aheadCount > 0 ? "↑" + root.aheadCount : "")
     active: root.opened
     tooltipText: {
@@ -242,7 +242,7 @@ Panel {
             iconComponent: Component {
               Text {
                 textFormat: Text.PlainText
-                text: "\uf09b"
+                text: "\uf021"
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.title * 1.4
                 color: root.accent
