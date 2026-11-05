@@ -1,0 +1,106 @@
+{
+  "bar": {
+    "layout": {
+      "center": [
+        {
+          "id": "omarchy.clock",
+          "format": "ddd d MMM h:mm AP",
+          "formatAlt": "d MMMM 'W'ww yyyy",
+          "verticalFormat": "HH\n—\nmm"
+        }
+      ],
+      "left": [
+        {
+          "id": "omarchy.menu"
+        },
+        {
+          "id": "omarchy.workspaces"
+        }
+      ],
+      "right": [
+        {
+          "id": "omarchy.tray"
+        },
+        {
+          "id": "io.github.nomanur.dotsync"
+        },
+        {
+          "id": "omarchy.keyboard-layout"
+        },
+        {
+          "id": "io.github.weedwhitesandwine.omascratch"
+        },
+        {
+          "id": "io.github.twiking.omasettings"
+        },
+        {
+          "id": "omarchy.agents"
+        },
+        {
+          "id": "omarchy.bluetooth"
+        },
+        {
+          "id": "omarchy.network"
+        },
+        {
+          "id": "omarchy.audio"
+        },
+        {
+          "id": "omarchy.monitor"
+        },
+        {
+          "id": "monk.aldente"
+        },
+        {
+          "id": "omarchy.power",
+          "showPercentage": false
+        }
+      ],
+      "centerBegin": [
+        {
+          "id": "omarchy.indicators"
+        }
+      ],
+      "centerEnd": [
+        {
+          "id": "omarchy.elsewhen",
+          "cities": [
+            {
+              "name": "Chennai",
+              "zone": "Asia/Kolkata"
+            },
+            {
+              "name": "Khulna",
+              "zone": "Asia/Dhaka",
+              "lat": 22.80979,
+              "lon": 89.56439,
+              "region": "Khulna Division, BD"
+            }
+          ]
+        },
+        {
+          "id": "omarchy.weather"
+        },
+        {
+          "id": "io.github.r4y-br.quran-motivation"
+        },
+        {
+          "id": "omarchy.system-update"
+        }
+      ],
+      "tray": []
+    },
+    "position": "top",
+    "transparent": true
+  },
+  "idle": {
+    "lock": 300,
+    "screensaver": 150
+  },
+  "plugins": [
+    {
+      "id": "io.github.andyweiboan.missioncontrol"
+    }
+  ],
+  "version": 1
+}

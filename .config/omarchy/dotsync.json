@@ -1,0 +1,10 @@
+{
+  "repo_type": "bare",
+  "git_dir": "/home/nomanur/.dotfiles",
+  "work_tree": "/home/nomanur",
+  "auto_add_omarchy": true,
+  "default_remote": "origin",
+  "default_branch": "main",
+  "last_sync": null,
+  "remote_url": "git@github.com:nomanur/dotfile.git"
+}

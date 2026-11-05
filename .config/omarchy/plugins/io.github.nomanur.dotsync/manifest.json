@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.nomanur.dotsync",
+  "name": "Omarchy DotSync",
+  "version": "1.0.0",
+  "author": "nomanur",
+  "license": "MIT",
+  "description": "Sync and backup your Omarchy Linux configurations and dotfiles with GitHub.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Git Sync",
+    "description": "Push and pull Omarchy configs to/from GitHub",
+    "category": "System",
+    "aliases": ["sync", "git", "dotfiles", "backup", "github"],
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}

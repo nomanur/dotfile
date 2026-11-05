@@ -1,0 +1,390 @@
+#!/usr/bin/env python3
+"""
+dotsync-ctl: CLI and backend for Omarchy DotSync plugin.
+Manages git status, staging, commit, push, and pull for Omarchy dotfiles and configurations.
+"""
+
+import sys
+import os
+import json
+import argparse
+import subprocess
+import datetime
+import re
+from pathlib import Path
+
+CONFIG_PATH = Path.home() / ".config" / "omarchy" / "dotsync.json"
+STATE_PATH = Path.home() / ".config" / "omarchy" / "dotsync-state.json"
+
+def get_settings():
+    default_settings = {
+        "repo_type": "bare",
+        "git_dir": str(Path.home() / ".dotfiles"),
+        "work_tree": str(Path.home()),
+        "auto_add_omarchy": True,
+        "default_remote": "origin",
+        "default_branch": "main",
+        "last_sync": None
+    }
+    if CONFIG_PATH.exists():
+        try:
+            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+                user_cfg = json.load(f)
+                default_settings.update(user_cfg)
+        except Exception:
+            pass
+    return default_settings
+
+def save_settings(settings):
+    CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+        json.dump(settings, f, indent=2)
+
+def save_state(state):
+    STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(STATE_PATH, "w", encoding="utf-8") as f:
+        json.dump(state, f, indent=2)
+
+def get_git_cmd_base(settings):
+    git_dir = os.path.expanduser(settings.get("git_dir", str(Path.home() / ".dotfiles")))
+    work_tree = os.path.expanduser(settings.get("work_tree", str(Path.home())))
+    
+    if settings.get("repo_type") == "bare" or (Path(git_dir) / "config").exists() and not (Path(git_dir) / ".git").exists():
+        return ["git", f"--git-dir={git_dir}", f"--work-tree={work_tree}"]
+    else:
+        return ["git", "-C", git_dir]
+
+def run_git(args, settings=None, env_extra=None):
+    if settings is None:
+        settings = get_settings()
+    base = get_git_cmd_base(settings)
+    full_cmd = base + args
+    env = os.environ.copy()
+    env["GIT_TERMINAL_PROMPT"] = "0"
+    if env_extra:
+        env.update(env_extra)
+    work_tree = os.path.expanduser(settings.get("work_tree", str(Path.home())))
+    result = subprocess.run(full_cmd, capture_output=True, text=True, env=env, cwd=work_tree)
+    return result
+
+def ensure_repo_exists(settings):
+    git_dir = Path(os.path.expanduser(settings.get("git_dir", str(Path.home() / ".dotfiles"))))
+    if (git_dir / "config").exists():
+        return True
+    return False
+
+def init_repo(remote_url=None):
+    settings = get_settings()
+    git_dir = Path(os.path.expanduser(settings.get("git_dir", str(Path.home() / ".dotfiles"))))
+    work_tree = Path(os.path.expanduser(settings.get("work_tree", str(Path.home()))))
+
+    git_dir.mkdir(parents=True, exist_ok=True)
+    # Init bare repository
+    res = subprocess.run(["git", "init", "--bare", str(git_dir)], capture_output=True, text=True)
+    if res.returncode != 0:
+        return {"ok": False, "error": f"Failed to init bare repo: {res.stderr.strip()}"}
+
+    # Hide untracked files by default in home directory
+    run_git(["config", "status.showUntrackedFiles", "no"], settings)
+    run_git(["config", "pull.rebase", "true"], settings)
+
+    # Set default branch
+    run_git(["branch", "-M", "main"], settings)
+
+    if remote_url:
+        set_remote_url(remote_url)
+
+    # Auto-track essential Omarchy configs
+    essential_configs = [
+        ".config/omarchy",
+        ".config/hypr",
+        ".config/ghostty",
+        ".config/kitty",
+        ".config/foot",
+        ".config/alacritty",
+        ".zshrc",
+        ".bashrc"
+    ]
+    added = []
+    for rel_path in essential_configs:
+        full_p = work_tree / rel_path
+        if full_p.exists():
+            run_git(["add", str(full_p)], settings)
+            added.append(rel_path)
+
+    return {"ok": True, "message": "Initialized dotfiles repository", "added_configs": added}
+
+def get_remote_url():
+    settings = get_settings()
+    if not ensure_repo_exists(settings):
+        return ""
+    res = run_git(["remote", "get-url", settings.get("default_remote", "origin")], settings)
+    if res.returncode == 0:
+        return res.stdout.strip()
+    return ""
+
+def set_remote_url(url):
+    url = url.strip()
+    settings = get_settings()
+    if not ensure_repo_exists(settings):
+        init_res = init_repo(url)
+        if not init_res.get("ok"):
+            return init_res
+
+    remote_name = settings.get("default_remote", "origin")
+    # Check if remote exists
+    res = run_git(["remote"], settings)
+    remotes = res.stdout.split()
+    if remote_name in remotes:
+        res = run_git(["remote", "set-url", remote_name, url], settings)
+    else:
+        res = run_git(["remote", "add", remote_name, url], settings)
+
+    if res.returncode != 0:
+        return {"ok": False, "error": res.stderr.strip()}
+
+    settings["remote_url"] = url
+    save_settings(settings)
+    return {"ok": True, "remote_url": url, "message": f"Updated remote {remote_name} to {url}"}
+
+def convert_url_ssh(url):
+    # Converts https://github.com/user/repo(.git) -> git@github.com:user/repo.git
+    m = re.match(r"^https?://([^/]+)/([^/]+)/([^/]+?)(?:\.git)?$", url)
+    if m:
+        host, user, repo = m.groups()
+        return f"git@{host}:{user}/{repo}.git"
+    return url
+
+def convert_url_https(url):
+    # Converts git@github.com:user/repo.git -> https://github.com/user/repo.git
+    m = re.match(r"^git@([^:]+):([^/]+)/([^/]+?)(?:\.git)?$", url)
+    if m:
+        host, user, repo = m.groups()
+        return f"https://{host}/{user}/{repo}.git"
+    return url
+
+def get_status():
+    settings = get_settings()
+    git_dir = settings.get("git_dir", str(Path.home() / ".dotfiles"))
+    work_tree = settings.get("work_tree", str(Path.home()))
+
+    if not ensure_repo_exists(settings):
+        return {
+            "ok": True,
+            "initialized": False,
+            "git_dir": git_dir,
+            "work_tree": work_tree,
+            "remote_url": "",
+            "branch": "main",
+            "ahead": 0,
+            "behind": 0,
+            "clean": True,
+            "modified_count": 0,
+            "files": [],
+            "last_commit": None,
+            "last_sync": settings.get("last_sync"),
+            "message": "Repository not initialized yet"
+        }
+
+    remote_url = get_remote_url()
+    is_ssh = remote_url.startswith("git@")
+
+    # Current branch
+    res = run_git(["branch", "--show-current"], settings)
+    branch = res.stdout.strip() or "main"
+
+    # Status porcelain
+    res = run_git(["status", "--porcelain"], settings)
+    files = []
+    if res.returncode == 0:
+        for raw_line in res.stdout.splitlines():
+            if len(raw_line) > 3:
+                status_code = raw_line[:2].strip()
+                path = raw_line[3:].strip()
+                files.append({"status": status_code, "path": path})
+
+    # Ahead / Behind check
+    ahead = 0
+    behind = 0
+    res_rev = run_git(["rev-list", "--left-right", "--count", f"HEAD...@{'{upstream}'}"], settings)
+    if res_rev.returncode == 0 and res_rev.stdout.strip():
+        parts = res_rev.stdout.strip().split()
+        if len(parts) == 2:
+            try:
+                ahead = int(parts[0])
+                behind = int(parts[1])
+            except ValueError:
+                pass
+
+    # Last commit info
+    last_commit = None
+    res_log = run_git(["log", "-1", "--format=%h|%an|%ar|%s"], settings)
+    if res_log.returncode == 0 and res_log.stdout.strip():
+        parts = res_log.stdout.strip().split("|", 3)
+        if len(parts) == 4:
+            last_commit = {
+                "hash": parts[0],
+                "author": parts[1],
+                "relative_date": parts[2],
+                "message": parts[3]
+            }
+
+    return {
+        "ok": True,
+        "initialized": True,
+        "git_dir": git_dir,
+        "work_tree": work_tree,
+        "remote_url": remote_url,
+        "is_ssh": is_ssh,
+        "branch": branch,
+        "ahead": ahead,
+        "behind": behind,
+        "clean": len(files) == 0 and ahead == 0,
+        "modified_count": len(files),
+        "files": files[:30],
+        "last_commit": last_commit,
+        "last_sync": settings.get("last_sync")
+    }
+
+def push(commit_message=None):
+    settings = get_settings()
+    if not ensure_repo_exists(settings):
+        return {"ok": False, "error": "Repository not initialized. Set remote URL first."}
+
+    remote_url = get_remote_url()
+    if not remote_url:
+        return {"ok": False, "error": "No remote GitHub URL configured. Please enter your repository link."}
+
+    # Auto-stage tracked modified files
+    res_add = run_git(["add", "-u"], settings)
+    if res_add.returncode != 0:
+        return {"ok": False, "error": f"Failed to stage files: {res_add.stderr.strip()}"}
+
+    # Auto-add any new files in ~/.config/omarchy and ~/.config/hypr if enabled
+    if settings.get("auto_add_omarchy", True):
+        work_tree = Path(os.path.expanduser(settings.get("work_tree", str(Path.home()))))
+        omarchy_dir = work_tree / ".config" / "omarchy"
+        hypr_dir = work_tree / ".config" / "hypr"
+        if omarchy_dir.exists():
+            run_git(["add", str(omarchy_dir)], settings)
+        if hypr_dir.exists():
+            run_git(["add", str(hypr_dir)], settings)
+
+    # Check if there are changes to commit
+    res_st = run_git(["status", "--porcelain"], settings)
+    has_changes = bool(res_st.stdout.strip())
+
+    if has_changes:
+        msg = commit_message.strip() if commit_message and commit_message.strip() else f"Sync Omarchy config - {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}"
+        res_ci = run_git(["commit", "-m", msg], settings)
+        if res_ci.returncode != 0:
+            return {"ok": False, "error": f"Commit failed: {res_ci.stderr.strip()}"}
+
+    # Get current branch
+    res_br = run_git(["branch", "--show-current"], settings)
+    branch = res_br.stdout.strip() or "main"
+    remote_name = settings.get("default_remote", "origin")
+
+    # Push to remote
+    res_push = run_git(["push", "-u", remote_name, branch], settings)
+    if res_push.returncode != 0:
+        err = res_push.stderr.strip() or res_push.stdout.strip()
+        if "Permission denied (publickey)" in err:
+            err = "SSH authentication failed. Ensure your SSH key is added to GitHub, or use an authorized remote URL."
+        elif "could not read Username" in err or "terminal prompts disabled" in err:
+            err = "Authentication required. For HTTPS repositories, configure git credentials or switch to SSH (git@github.com:...)."
+        elif "[rejected]" in err or "fetch first" in err:
+            err = "Remote has newer changes. Please pull first before pushing."
+        return {"ok": False, "error": err}
+
+    now_iso = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    settings["last_sync"] = now_iso
+    save_settings(settings)
+
+    return {
+        "ok": True,
+        "message": f"Successfully pushed Omarchy config to {remote_name}/{branch}",
+        "last_sync": now_iso
+    }
+
+def pull():
+    settings = get_settings()
+    if not ensure_repo_exists(settings):
+        return {"ok": False, "error": "Repository not initialized. Set remote URL first."}
+
+    remote_name = settings.get("default_remote", "origin")
+    res_br = run_git(["branch", "--show-current"], settings)
+    branch = res_br.stdout.strip() or "main"
+
+    res_pull = run_git(["pull", "--rebase", remote_name, branch], settings)
+    if res_pull.returncode != 0:
+        err = res_pull.stderr.strip() or res_pull.stdout.strip()
+        if "could not read Username" in err or "terminal prompts disabled" in err:
+            err = "Authentication required. Use SSH (git@github.com:...) or setup git credentials."
+        return {"ok": False, "error": err}
+
+    now_iso = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    settings["last_sync"] = now_iso
+    save_settings(settings)
+
+    return {
+        "ok": True,
+        "message": res_pull.stdout.strip() or "Successfully pulled latest updates from GitHub",
+        "last_sync": now_iso
+    }
+
+def main():
+    parser = argparse.ArgumentParser(description="Omarchy DotSync Control")
+    subparsers = parser.add_subparsers(dest="command")
+
+    sub_status = subparsers.add_parser("status", help="Get current git status")
+    sub_status.add_argument("--json", action="store_true", default=True)
+
+    sub_remote = subparsers.add_parser("set-remote", help="Set remote git URL")
+    sub_remote.add_argument("url", type=str)
+    sub_remote.add_argument("--json", action="store_true", default=True)
+
+    sub_push = subparsers.add_parser("push", help="Commit and push changes")
+    sub_push.add_argument("--message", "-m", type=str, default="")
+    sub_push.add_argument("--json", action="store_true", default=True)
+
+    sub_pull = subparsers.add_parser("pull", help="Pull latest changes from remote")
+    sub_pull.add_argument("--json", action="store_true", default=True)
+
+    sub_init = subparsers.add_parser("init", help="Initialize repository")
+    sub_init.add_argument("--url", type=str, default="")
+    sub_init.add_argument("--json", action="store_true", default=True)
+
+    sub_ssh = subparsers.add_parser("toggle-ssh", help="Switch between SSH and HTTPS URL")
+    sub_ssh.add_argument("--json", action="store_true", default=True)
+
+    args = parser.parse_args()
+
+    if args.command == "status" or not args.command:
+        res = get_status()
+        print(json.dumps(res))
+    elif args.command == "set-remote":
+        res = set_remote_url(args.url)
+        print(json.dumps(res))
+    elif args.command == "push":
+        res = push(args.message)
+        print(json.dumps(res))
+    elif args.command == "pull":
+        res = pull()
+        print(json.dumps(res))
+    elif args.command == "init":
+        res = init_repo(args.url)
+        print(json.dumps(res))
+    elif args.command == "toggle-ssh":
+        curr = get_remote_url()
+        if curr.startswith("git@"):
+            new_url = convert_url_https(curr)
+        else:
+            new_url = convert_url_ssh(curr)
+        res = set_remote_url(new_url)
+        print(json.dumps(res))
+    else:
+        parser.print_help()
+
+if __name__ == "__main__":
+    main()
