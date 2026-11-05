@@ -16,6 +16,20 @@ from pathlib import Path
 CONFIG_PATH = Path.home() / ".config" / "omarchy" / "dotsync.json"
 STATE_PATH = Path.home() / ".config" / "omarchy" / "dotsync-state.json"
 
+def load_state():
+    if STATE_PATH.exists():
+        try:
+            with open(STATE_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+def save_state(state):
+    STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(STATE_PATH, "w", encoding="utf-8") as f:
+        json.dump(state, f, indent=2)
+
 def get_settings():
     default_settings = {
         "repo_type": "bare",
@@ -24,26 +38,30 @@ def get_settings():
         "auto_add_omarchy": True,
         "default_remote": "origin",
         "default_branch": "main",
-        "last_sync": None
     }
     if CONFIG_PATH.exists():
         try:
             with open(CONFIG_PATH, "r", encoding="utf-8") as f:
                 user_cfg = json.load(f)
+                user_cfg.pop("last_sync", None)
                 default_settings.update(user_cfg)
         except Exception:
             pass
+    default_settings["last_sync"] = load_state().get("last_sync")
     return default_settings
 
 def save_settings(settings):
+    cfg = {k: v for k, v in settings.items() if k != "last_sync"}
     CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
     with open(CONFIG_PATH, "w", encoding="utf-8") as f:
-        json.dump(settings, f, indent=2)
+        json.dump(cfg, f, indent=2)
 
-def save_state(state):
-    STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with open(STATE_PATH, "w", encoding="utf-8") as f:
-        json.dump(state, f, indent=2)
+def save_last_sync():
+    state = load_state()
+    now_iso = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    state["last_sync"] = now_iso
+    save_state(state)
+    return now_iso
 
 def get_git_cmd_base(settings):
     git_dir = os.path.expanduser(settings.get("git_dir", str(Path.home() / ".dotfiles")))
@@ -297,9 +315,7 @@ def push(commit_message=None):
             err = "Remote has newer changes. Please pull first before pushing."
         return {"ok": False, "error": err}
 
-    now_iso = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-    settings["last_sync"] = now_iso
-    save_settings(settings)
+    now_iso = save_last_sync()
 
     return {
         "ok": True,
@@ -323,9 +339,7 @@ def pull():
             err = "Authentication required. Use SSH (git@github.com:...) or setup git credentials."
         return {"ok": False, "error": err}
 
-    now_iso = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-    settings["last_sync"] = now_iso
-    save_settings(settings)
+    now_iso = save_last_sync()
 
     return {
         "ok": True,
