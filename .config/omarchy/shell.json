@@ -3,10 +3,42 @@
     "layout": {
       "center": [
         {
-          "id": "omarchy.clock",
           "format": "ddd d MMM h:mm AP",
           "formatAlt": "d MMMM 'W'ww yyyy",
+          "id": "omarchy.clock",
           "verticalFormat": "HH\n—\nmm"
+        }
+      ],
+      "centerBegin": [
+        {
+          "id": "omarchy.indicators"
+        }
+      ],
+      "centerEnd": [
+        {
+          "cities": [
+            {
+              "name": "Chennai",
+              "zone": "Asia/Kolkata"
+            },
+            {
+              "lat": 22.80979,
+              "lon": 89.56439,
+              "name": "Khulna",
+              "region": "Khulna Division, BD",
+              "zone": "Asia/Dhaka"
+            }
+          ],
+          "id": "omarchy.elsewhen"
+        },
+        {
+          "id": "omarchy.weather"
+        },
+        {
+          "id": "io.github.r4y-br.quran-motivation"
+        },
+        {
+          "id": "omarchy.system-update"
         }
       ],
       "left": [
@@ -56,42 +88,20 @@
           "showPercentage": false
         }
       ],
-      "centerBegin": [
-        {
-          "id": "omarchy.indicators"
-        }
-      ],
-      "centerEnd": [
-        {
-          "id": "omarchy.elsewhen",
-          "cities": [
-            {
-              "name": "Chennai",
-              "zone": "Asia/Kolkata"
-            },
-            {
-              "name": "Khulna",
-              "zone": "Asia/Dhaka",
-              "lat": 22.80979,
-              "lon": 89.56439,
-              "region": "Khulna Division, BD"
-            }
-          ]
-        },
-        {
-          "id": "omarchy.weather"
-        },
-        {
-          "id": "io.github.r4y-br.quran-motivation"
-        },
-        {
-          "id": "omarchy.system-update"
-        }
-      ],
       "tray": []
     },
     "position": "top",
     "transparent": true
+  },
+  "dock": {
+    "pinned": [
+      "org.gnome.Nautilus",
+      "chromium",
+      "omacalc",
+      "omawrite",
+      "X",
+      "YouTube"
+    ]
   },
   "idle": {
     "lock": 300,
