@@ -88,7 +88,11 @@
           "showPercentage": false
         }
       ],
-      "tray": []
+      "tray": [
+        {
+          "id": "superwhisper.panel"
+        }
+      ]
     },
     "position": "top",
     "transparent": true
