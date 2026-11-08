@@ -95,7 +95,7 @@
   },
   "dock": {
     "pinned": [
-      "org.gnome.Nautilus",
+      "com.thisisgm.flea",
       "chromium",
       "omacalc",
       "omawrite",
