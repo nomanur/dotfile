@@ -116,8 +116,5 @@
       "id": "io.github.andyweiboan.missioncontrol"
     }
   ],
-  "version": 1,
-  "disabledPlugins": [
-    "omarchy.background"
-  ]
+  "version": 1
 }
